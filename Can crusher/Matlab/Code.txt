@@ -1,0 +1,156 @@
+%% ================= Constants =================
+L2 = 0.06;
+L3 = 0.10;
+L4 = 0.25;
+L5 = 0.05;
+L6 = 0.02;
+
+XQ = 0;
+YQ = L3;
+YC_fixed = 0.13706;
+
+g = 9.81;
+
+%% ================= Masses (kg) =================
+m2 = 0.01;
+m4 = 0.014;
+m5 = 0.08;
+m6 = 0.035;
+
+%% ================= Inputs =================
+theta2_deg= 132;
+w2 = 2.5;
+alpha2 = 0;
+M12 = 20;
+theta2=deg2rad(theta2_deg);
+
+%% ================= Position Analysis =================
+XA = L2*cos(theta2);
+YA = L2*sin(theta2);
+
+X = sqrt((XA-XQ)^2 + (YA-YQ)^2);
+cos_theta3=(XA-XQ)/X;
+sin_theta3=(YA-YQ)/X;
+theta3 = atan2(sin_theta3,cos_theta3);
+
+XB = XQ + L4*cos(theta3);
+YB = YQ + L4*sin(theta3);
+
+arg = (YC_fixed - YB)/L5;
+
+theta4 = asin(arg);
+theta4_deg = rad2deg(theta4);
+
+XC = XB + L5*cos(theta4);
+YC = YB + L5*sin(theta4);
+
+XD = XC + L6;
+YD = YC;
+
+%% ================= Velocity Analysis =================
+VAx = L2*w2*sin(theta2);
+VAy = L2*w2*cos(theta2);
+
+w3 = (VAx*sin(theta3) - 1j*VAy*cos(theta3))/X;
+VEA = -VAx*cos(theta3) - VAy*sin(theta3);
+
+VBx = -w3*L4*sin(theta3);
+VBy =  w3*L4*cos(theta3);
+
+if abs(sin(theta4)) < 1e-6
+    error('Velocity singularity: sin(theta4)=0');
+end
+
+w4 = -VBx/(L5*cos(theta4));
+
+VCx = VBx - w4*L5*sin(theta4);
+VCy = VBy + w4*L5*cos(theta4);
+
+%% ================= Acceleration Analysis =================
+AAx = -L2*w2^2*cos(theta2) - L2*alpha2*sin(theta2);
+AAy = -L2*w2^2*sin(theta2 + L2*alpha2*cos(theta2));
+
+alpha3 = (-AAx*sin(theta3) + AAy*cos(theta3) + 2*VEA*w3)/X;
+
+ABx = -L4*w3^2*cos(theta3) - L4*alpha3*sin(theta3);
+ABy = -L4*w3^2*sin(theta3) + L4*alpha3*cos(theta3);
+
+alpha4 = (-ABy + 1j*L5*w4*sin(theta4))/(L5*cos(theta4));
+
+ACx = ABx - L5*w4^2*cos(theta4) - L5*alpha4*sin(theta4);
+ACy = ABy - L5*w4^2*sin(theta4) + L5*alpha4*cos(theta4);
+
+%% ================= Force Analysis (Numeric) =================
+g2 = L2/2; g4 = L4/2; g5 = L5/2;
+
+Ig2 = m2*L2^2/12;
+Ig4 = m4*L4^2/12;
+Ig5 = m5*L5^2/12;
+
+Ag2x = -w2^2*g2*cos(theta2);
+Ag2y = -w2^2*g2*sin(theta2);
+
+Ag4x = -w4^2*g4*cos(theta4) - alpha4*g4*sin(theta4);
+Ag4y = -w4^2*g4*sin(theta4) + alpha4*g4*cos(theta4);
+
+Ag5x = ACx - w4^2*g5*cos(theta4) - alpha4*g5*sin(theta4);
+Ag5y = ACy - w4^2*g5*sin(theta4) + alpha4*g5*cos(theta4);
+
+Ag6x = ACx;
+Ag6y = ACy;
+
+%% ===== Build numeric system: A*R = B =====
+A = [
+    L2*sin(theta2)  -L2*cos(theta2) 0 0 0 0 0;   % moment eq on link2
+    1 0 0 0 0 0 0;                             % eq1: Rax
+    0 1 0 0 0 0 0;                             % eq2: Ray
+    1 0 -1 0 0 0 0;                            % eq3: Rax-Rbx
+    0 1 0 -1 0 0 0;                            % eq4: Ray-Rby
+    0 0 1 0 -1 0 0;                            % eq6: Rbx-Rcx
+    0 0 0 1 0 -1 0;                            % eq7: Rby-Rcy
+    0 0 0 0 1 0 -1;                            % eq9: Rcx-F
+    0 0 0 0 0 1 0;                             % eq10: Rcy
+    ];
+
+B = [
+    Ig2*alpha2 - M12;
+    m2*Ag2x;
+    m2*Ag2y + m2*g;
+    m4*Ag4x;
+    m4*Ag4y + m4*g;
+    m5*Ag5x;
+    m5*Ag5y + m5*g;
+    m6*Ag6x;
+    m6*Ag6y + m6*g;
+    ];
+
+R_numeric = A\B;  % numeric solution
+
+Rax = R_numeric(1); Ray = R_numeric(2);
+Rbx = R_numeric(3); Rby = R_numeric(4);
+Rcx = R_numeric(5); Rcy = R_numeric(6);
+F    = R_numeric(7);
+
+%% ================= Results =================
+disp('===== POSITION =====')
+fprintf('A(%.4f , %.4f)\n',XA,YA)
+fprintf('B(%.4f , %.4f)\n',XB,YB)
+fprintf('C(%.4f , %.4f)\n\n',XC,YC)
+
+disp('===== ANGLES (deg) =====')
+fprintf('theta2 = %.2f\n',rad2deg(theta2))
+fprintf('theta3 = %.2f\n',rad2deg(theta3))
+fprintf('theta4 = %.2f\n\n',rad2deg(theta4))
+
+disp('===== VELOCITIES =====')
+fprintf('VBx = %.4f , VBy = %.4f\n',VBx,VBy)
+fprintf('VCx = %.4f , VCy = %.4f\n\n',VCx,VCy)
+
+disp('===== ACCELERATIONS =====')
+fprintf('ACx = %.4f , ACy = %.4f\n\n',ACx,ACy)
+
+disp('===== FORCES =====')
+fprintf('Rax = %.3f , Ray = %.3f\n',Rax,Ray)
+fprintf('Rbx = %.3f , Rby = %.3f\n',Rbx,Rby)
+fprintf('Rcx = %.3f , Rcy = %.3f\n',Rcx,Rcy)
+fprintf('Slider Force F = %.3f N\n',F)
