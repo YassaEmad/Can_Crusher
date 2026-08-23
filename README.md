@@ -6,11 +6,11 @@ Mechanical can crusher designed to compress aluminum cans using a crank-slider m
 
 ## Assembly
 
-![Assembly](Images/Assembly.png)
+//![Assembly](Images/Assembly.png)
 
 ## Exploded View
 
-![Exploded View](Images/Exploded_View.png)
+//![Exploded View](Images/Exploded_View.png)
 
 ## Project Contents
 
